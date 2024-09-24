@@ -5,36 +5,34 @@
 #include<string>
 #include<algorithm>
 #include<unordered_map>
-#define MAX_NODE 1000
-#define MAX_GATE 1000
 
 using namespace std;
-
+//store literals
 struct NodeS {
 	vector<int>gate;
 };
-
+//store clauses
 struct GateS {
 	vector<int>nodes;
 };
 
 int N, G = 0;
-vector<int>assignment;
-vector<int>poly,note;
-vector<pair<int, int>>counter;
-unordered_map<int, int>match;
+vector<int>assignment;//a valid assignment
+vector<int>poly,note;//used to determine whether there is a unit-poly literal
+vector<pair<int, int>>counter;//used to determine the frequecy of each literal
+unordered_map<int, int>match;//how reordered literals correspond to original literals
 
 bool cmp(pair<int, int>a, pair<int, int>b) { return (a.second > b.second); }
-
+//read cnf and store it in nodes and gates
 bool readfile(string fileName, vector<NodeS>& nodes, vector<GateS>& gates)
 {
 	ifstream file(fileName);
 	if (!file.is_open()) {
-		cout << "读取文件错误！" << endl;
+		cout << "Error:fail to read file!" << endl;
 		return false;
 	}
 	string line;
-	for (int i = 0; i < 7;i++)getline(file, line);
+	for (int i = 0; i < 1;i++)getline(file, line);//delete useless lines
 	string lines = "";
 	while (getline(file, line))lines += line + " ";
 	stringstream ss(lines);
@@ -64,6 +62,7 @@ bool readfile(string fileName, vector<NodeS>& nodes, vector<GateS>& gates)
 				continue;
 			}
 			else {
+				//if some literals' value vary from 0 to 1,set poly[i] to 1
 				if (!poly[abs(num)]) {
 					if (note[abs(num)] == 0)note[abs(num)] = num;
 					else if (note[abs(num)] != num)poly[abs(num)] = 1;
@@ -78,9 +77,8 @@ bool readfile(string fileName, vector<NodeS>& nodes, vector<GateS>& gates)
 	}
 	return true;
 }
-
+//if a literal num is assigned,for a clause with num,we will delete all the literals in it;otherwise we will just delete num only,then if this is only a literal num',then its value is determined ,just deduction(num')
 bool deduction(int num,const vector<NodeS>&nodes,vector<GateS>&gates) {
-	//首先需要进行赋值并且判断矛盾
 	vector<int>exact_num;
 	for (int idx : nodes[abs(num)].gate) {
 		if (gates[idx].nodes.size() == 0)continue;
@@ -99,38 +97,12 @@ bool deduction(int num,const vector<NodeS>&nodes,vector<GateS>&gates) {
 			}
 		}
 		else  gate.nodes.clear(); 
-		//cout << num << " " << idx << " " << gate.nodes.size()<< endl;
-		//for (int i = 1; i < assignment.size(); i++)cout << assignment[i] << " ";
-		//cout << endl;
-		/*
-		if (gate.nodes.size() == 1 && (gate.nodes.find(num) == gate.nodes.end())) return false; 
-		else if(gate.num_unassign>0){
-			if (gate.nodes.find(num) != gate.nodes.end())gate.num_unassign == 0;
-			else {
-				gate.num_unassign--;
-				if (gate.num_unassign == 1) for (auto i : gate.nodes) if (i.second == 1) { 
-					int tmp = (i.first > 0) ? 1 : 0;
-					if (assignment[abs(i.first)] != -1 && assignment[abs(i.first)] != tmp) return false; 
-					else assignment[abs(i.first)] = tmp;
-					i.second = 0;
-					gate.num_unassign=0;
-					if(assignment[abs(i.first)] == -1)exact_num.push_back(i.first);
-					for (int x : nodes[abs(i.first)].gate)if (gates[x].nodes.find(i.first) != gates[x].nodes.end())gates[x].num_unassign = 0;
-				}
-
-				//for (int i = 1; i < assignment.size(); i++)cout << assignment[i] << " ";
-				//cout << endl;
-			}
-		}	*/
 	}
-	//for (int i = 1; i < assignment.size(); i++)cout << assignment[i] << " ";
-	//cout << endl;
 	for (int exact_n : exact_num)if (!deduction(exact_n, nodes, gates)) return false; 
 	return true;
 }
-
+//recursively assign each literal according to their frequncies.
 bool assign(int i,const vector<NodeS>&nodes,vector<GateS>&gates) {
-	//cout << match[i] << endl;
 	if (match[i] == N+1)return true;
 	else {
 		assignment[match[i]] = 0;
@@ -152,7 +124,6 @@ bool assign(int i,const vector<NodeS>&nodes,vector<GateS>&gates) {
 		assignment = tmp_assign;
 		assignment[match[i]] = 1;
 		gates = tmp_g;
-		//cout << i << "!" << endl;
 		if (deduction(match[i],nodes,gates)) {
 			for (int j = i + 1; j <= N; j++) {
 				if (assignment[match[j]] == -1) {
@@ -170,32 +141,34 @@ bool assign(int i,const vector<NodeS>&nodes,vector<GateS>&gates) {
 int main() {
 	vector<NodeS>nodes;
 	vector<GateS>gates;
-	for (int i = 1; i <= 1000; i++) {
-		//cout << i << endl;
-		string patialName = "E:\\cnfs\\uf20-";
-		string rest = "0" + std::to_string(i) + ".cnf";
-		readfile(patialName + rest, nodes, gates);
-		sort(counter.begin(), counter.end(),cmp);
-		for (int idx = 1; idx <= counter.size(); idx++) match[idx] = counter[idx - 1].first; 
-		assignment.assign(N + 1, -1);
-		for (int idx = 1; idx <= N; idx++)if (!poly[idx]) {
-			assignment[idx] = (note[idx] > 0) ? 1 : 0;
-			int num = note[idx];
-			for (int x : nodes[abs(num)].gate) {
-				GateS& g = gates[x];
-				if (g.nodes.size() == 0)continue;
-				if (std::find(g.nodes.begin(), g.nodes.end(), num) != g.nodes.end()) {
-					g.nodes.clear();
-				}
-				else g.nodes.erase(std::find(g.nodes.begin(), g.nodes.end(), -num));
+	string filename;
+	cin >> filename;
+	readfile(filename, nodes, gates);
+	sort(counter.begin(), counter.end(),cmp);//reorder the literals according to their frequencies
+	for (int idx = 1; idx <= counter.size(); idx++) match[idx] = counter[idx - 1].first; 
+	assignment.assign(N + 1, -1);
+	for (int idx = 1; idx <= N; idx++)if (!poly[idx]) {
+		assignment[idx] = (note[idx] > 0) ? 1 : 0;
+		int num = note[idx];
+		for (int x : nodes[abs(num)].gate) {
+			GateS& g = gates[x];
+			if (g.nodes.size() == 0)continue;
+			if (std::find(g.nodes.begin(), g.nodes.end(), num) != g.nodes.end()) {
+				g.nodes.clear();
 			}
+			else g.nodes.erase(std::find(g.nodes.begin(), g.nodes.end(), -num));
 		}
-		for (int idx = 1; idx <= N; idx++)if (assignment[match[idx]] == -1) { assign(idx, nodes, gates); break; }
-		ofstream os("E:\\answers\\answer"+std::to_string(i)+".txt");
-		for (int i = 1; i <= N; i++)os << assignment[i] << " ";
-		assignment.clear();
-		nodes.clear();
-		gates.clear();
 	}
+	int answer = 0;
+	for (int idx = 1; idx <= N; idx++)if (assignment[match[idx]] == -1) { answer=assign(idx, nodes, gates); break; }
+	if (answer) {
+		cout << "SAT!" << endl;
+		cout << "The assignment is:";
+		for (int i = 1; i <= N; i++)cout << assignment[i] << " ";
+	}
+	else cout << "UNSAT" << endl;
+	assignment.clear();
+	nodes.clear();
+	gates.clear();
 	return 0;
 }
